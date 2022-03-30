@@ -19,6 +19,9 @@ datadir = joinpath(pwd(),"data")
 DEFAULT_PORT = 8050
 
 using Dash
+using CitableBase: slidingwindow
+using SplitApplyCombine
+using PlotlyJS
 
 
 """Load data from local files."""
@@ -37,14 +40,15 @@ function loadtexts(dir)
     for txt in txts
         passages = []
         lines = readlines(joinpath(dir, txt))
+        
         for ln in lines
             m = match(re, ln)
             if ! isnothing(m)
                 (bk, ref, psg) = m.captures
-                push!(passages, ("$(bk):$(ref)", psg))
+                push!(passages, psg)
             end
         end
-        corpora[txt] = passages
+        corpora[txt] = join(passages, "\n")
     end
     (mddict, txts, langcodes, corpora)
 end
@@ -88,6 +92,14 @@ app.layout = html_div(className = "w3-container") do
 
         html_div(className = "w3-col l6 m6",
         children = [
+            dcc_markdown("*Translations to include:*"),
+            dcc_checklist(id="translations",
+            labelStyle = Dict("padding-right" => "5px", "display" => "block")
+            )
+        ]),
+
+        html_div(className = "w3-col l6 m6",
+        children = [
             dcc_markdown("*Filter texts by languages*:"),
             dcc_checklist(
                 id="languages",
@@ -100,25 +112,44 @@ app.layout = html_div(className = "w3-container") do
                     Dict("label" => "Greek", "value" => "grc"),
                     Dict("label" => "Hebrew", "value" => "hbo"),
                     Dict("label" => "Latin", "value" => "lat"),
-                    Dict("label" => "Russian", "value" => "rus")
+                    Dict("label" => "Russian", "value" => "rus"),
+                    Dict("label" => "Turkish", "value" => "tur")
                 ],
                 labelStyle = Dict("padding-right" => "10px")
-            )]),
+            )])
+    ]),
+        
 
+    html_div(className="w3-containter",
+    children = [
+        html_div(className = "w3-col l6 m6",
+        children = [
+            dcc_markdown("### Set size of n-gram"),
+            dcc_slider(
+                id="n",
+                min=1,
+                max=12,
+                step=1,
+                value=2,
+            )
+        ]),
 
         html_div(className = "w3-col l6 m6",
         children = [
-            dcc_markdown("*Translations to include:*"),
-            dcc_checklist(id="translations",
-            labelStyle = Dict("padding-right" => "5px", "display" => "block")
+            dcc_markdown("### Number of n-grams to display"),
+            dcc_slider(
+                id="topn",
+                min=20,
+                max=500,
+                step=10,
+                value=50,
             )
         ])
     ]),
-        
-     
 
-    html_div(className="w3-container", id = "header"),
-    html_div(className="w3-container", id="columns") 
+
+    html_div(className="w3-container", id = "n_message"),
+    html_div(className="w3-container", id="results") 
 end
 
 """Compose options for menu of translations.
@@ -139,6 +170,54 @@ function xlationoptions(files, titles, langlist)
     opts
 end
 
+
+
+function ngram(textlist, n, shown, sources)
+    rslts = []
+    textcontent = []
+    for txt in textlist
+        if haskey(sources,txt)
+            push!(textcontent, sources[txt])
+        else
+            push!(rslts, "NO MATCH FOR KEY ", txt)
+        end
+    end
+    chardata = textcontent |> Iterators.flatten |> collect 
+    stringdata = filter(c -> ! ispunct(c), chardata) |> String
+    grams = slidingwindow(split(stringdata), n = n)
+    clustered = map(t -> join(t,"_"), grams) |> group
+    ngramdata = []
+     for k in keys(clustered)
+        push!(ngramdata, (k, length(clustered[k])))
+    end
+    sort!(ngramdata, by = pr -> pr[2], rev = true)
+    
+    graphlayout =  Layout(
+        title = "$(n)-gram frequency",
+        xaxis_title = "$(n)-gram",
+        yaxis_title = "Occurrences"
+    )
+
+    gramlist = map(pr -> pr[1], ngramdata)
+    gramcounts = map(pr -> pr[2], ngramdata)
+    fig = bar(x=gramlist[1:shown], y=gramcounts[1:shown]) |> Plot
+    [dcc_markdown("## Corpus of $(gramlist |> length) $(n)-grams: top $(shown) $(n)-grams."),
+    dcc_graph(figure = fig)
+    ]
+end
+
+# Graph `topn` n-grams
+callback!(app,
+    Output("n_message", "children"),
+    Output("results", "children"),
+    Input("translations", "value"),
+    Input("n", "value"),
+    Input("topn", "value")
+) do textlist, nvalue, displaynum
+    msg = dcc_markdown("Settings: show top $(displaynum) $(nvalue)-grams")
+    rslts = isnothing(textlist) || isempty(textlist) ? "" : ngram(textlist, nvalue, displaynum, texts)
+    (msg, rslts)
+end
 
 # Filter translations menu on language choices:
 callback!(app,
