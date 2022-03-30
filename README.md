@@ -1,1 +1,1 @@
-# ebiblengrams
+# ebible-ngrams
