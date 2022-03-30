@@ -79,18 +79,21 @@ app.layout = html_div(className = "w3-container") do
         dcc_markdown("`n-gram` viewer ")
     end,
 
-    html_h3("Select texts and passage"),
-    dcc_markdown("Optionally filter by language, then select one or more texts to view."),
+    html_h3("Select texts to analyze"),
+    dcc_markdown("Optionally filter by language, then select one or more texts."),
+
 
     html_div(className="w3-container",
     children = [
-        html_div(className="w3-col l3 m3",
+
+        html_div(className = "w3-col l6 m6",
         children = [
             dcc_markdown("*Filter texts by languages*:"),
             dcc_checklist(
                 id="languages",
                 options = [
                     Dict("label" => "Arabic", "value" => "arb"),
+                    Dict("label" => "Dutch", "value" => "nld"),
                     Dict("label" => "English", "value" => "eng"),
                     Dict("label" => "French", "value" => "fra"),
                     Dict("label" => "German", "value" => "deu"),
@@ -98,19 +101,21 @@ app.layout = html_div(className = "w3-container") do
                     Dict("label" => "Hebrew", "value" => "hbo"),
                     Dict("label" => "Latin", "value" => "lat"),
                     Dict("label" => "Russian", "value" => "rus")
-                ]
-            )
-        ]),
-    
-        html_div(className="w3-col l5 m5",
+                ],
+                labelStyle = Dict("padding-right" => "10px")
+            )]),
+
+
+        html_div(className = "w3-col l6 m6",
         children = [
             dcc_markdown("*Translations to include:*"),
-            dcc_checklist(id="translations")
+            dcc_checklist(id="translations",
+            labelStyle = Dict("padding-right" => "5px", "display" => "block")
+            )
         ])
-  
-
-
     ]),
+        
+     
 
     html_div(className="w3-container", id = "header"),
     html_div(className="w3-container", id="columns") 
